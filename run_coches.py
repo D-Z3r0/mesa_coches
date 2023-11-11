@@ -1,29 +1,61 @@
-from coches_model import mesa, CityModel, CarAgent, TaxiAgent, DrunkDriverAgent, StreetAgent, SidewalkAgent
+import seaborn as sns
+import pandas as pd
+import matplotlib.pyplot as plt
+from coches_model import CityModel
 
-# Modificar la función de visualización
-def agent_portrayal(agent):
-    if isinstance(agent, TaxiAgent):  # Verifica primero TaxiAgent
-        portrayal = {"Shape": "rect", "Filled": "true", "Color": "yellow", "Layer": 3, "w": 0.5, "h": 1}
-        if agent.wait_time > 0:
-            portrayal["Color"] = "orange"  # Los taxis recogiendo pasajeros se muestran en naranja
-    elif isinstance(agent, DrunkDriverAgent):  # Luego verifica DrunkDriverAgent
-        portrayal = {"Shape": "rect", "Filled": "true", "Color": "blue", "Layer": 4, "w": 0.5, "h": 1}
-        if agent.collided:
-            portrayal["Color"] = "black"  # Los conductores ebrios colisionados se muestran en negro
-    elif isinstance(agent, CarAgent):  # Finalmente, verifica CarAgent
-        portrayal = {"Shape": "rect", "Filled": "true", "Layer": 2, "w":0.5, "h":1}
-        portrayal["Color"] = "black" if agent.collided else "red"  # Negro si colisionó, rojo de lo contrario
-    elif isinstance(agent, StreetAgent):
-        portrayal = {"Shape": "rect", "Filled": "true", "Color": "grey", "Layer": 1, "w": 1, "h": 1}
-    elif isinstance(agent, SidewalkAgent):
-        portrayal = {"Shape": "rect", "Filled": "true", "Color": "green", "Layer": 0, "w": 1, "h": 1}
-    return portrayal
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
 
-grid = mesa.visualization.CanvasGrid(agent_portrayal, 20, 20, 500, 500)
+def run_model():
+    model = CityModel(num_cars=10, num_lanes=4, grid_width=20, grid_height=20)
+    for i in range(300):
+        model.step()
+    data = model.datacollector.get_model_vars_dataframe()
+    total_collisions = data.iloc[-1]['Total Collisions']
+    return total_collisions, data
 
-server = mesa.visualization.ModularServer(CityModel,
-                       [grid],
-                       "City Model",
-                       {"num_cars":1, "num_lanes": 4, "grid_width":20, "grid_height":20})
-server.port = 8521 # The default
-server.launch()
+# Ejecutar la simulación 100 veces y almacenar los totales de colisiones y los DataFrames
+total_collisions_per_run = []
+all_runs_data = []
+for _ in range(100):
+    total_collisions, data = run_model()
+    total_collisions_per_run.append(total_collisions)
+    all_runs_data.append(data)
+
+# Concatenar todos los DataFrames en uno solo
+all_runs_df = pd.concat(all_runs_data, ignore_index=True)
+
+# Crear una figura con dos subgráficos
+fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(10, 15))
+
+
+
+# Primera gráfica: Lineplot del total de colisiones en cada ejecución
+sns.lineplot(data=total_collisions_per_run, ax=axes[0])
+axes[0].set_title('Total Collisions per Run')
+axes[0].set_xlabel('Run Number')
+axes[0].set_ylabel('Total Collisions')
+
+
+
+# Preparar datos para la gráfica de barras
+total_car_collisions = all_runs_df['Car Collisions'].sum()
+total_taxi_collisions = all_runs_df['Taxi Collisions'].sum()
+total_drunk_driver_collisions = all_runs_df['DrunkDriver Collisions'].sum()
+
+collisions_data = {
+    'Agent Type': ['Cars', 'Taxis', 'Drunk Drivers'],
+    'Total Collisions': [total_car_collisions, total_taxi_collisions, total_drunk_driver_collisions]
+}
+collisions_df = pd.DataFrame(collisions_data)
+
+# Segunda gráfica: Barplot de colisiones totales por tipo de agente
+sns.barplot(x='Agent Type', y='Total Collisions', data=collisions_df, ax=axes[1])
+axes[1].set_title('Total Collisions by Agent Type Across All Runs')
+axes[1].set_xlabel('Agent Type')
+axes[1].set_ylabel('Total Collisions')
+
+# Mostrar las gráficas
+plt.tight_layout()
+plt.show()

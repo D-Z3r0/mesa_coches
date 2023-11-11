@@ -3,12 +3,13 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import random
+from mesa.datacollection import DataCollector
 
 class SidewalkAgent(mesa.Agent):
     """An agent representing a sidewalk."""
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        print(f"Banqueta Agent Created {str(self.unique_id)}.")
+        # print(f"Banqueta Agent Created {str(self.unique_id)}.")
 
 
 
@@ -17,7 +18,7 @@ class StreetAgent(mesa.Agent):
     """An agent representing a street lane."""
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        print(f"Calle Agent Created {str(self.unique_id)}.")
+        # print(f"Calle Agent Created {str(self.unique_id)}.")
 
 
 
@@ -234,6 +235,16 @@ class CityModel(mesa.Model):
             self.grid.place_agent(car, (x, 0))
             self.schedule.add(car)
 
+        self.datacollector = DataCollector(
+            model_reporters={
+                "Total Collisions": lambda m: sum(1 for a in m.schedule.agents if getattr(a, 'collided', False)),
+                "Car Collisions": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, CarAgent) and a.collided),
+                "Taxi Collisions": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, TaxiAgent) and a.collided),
+                "DrunkDriver Collisions": lambda m: sum(1 for a in m.schedule.agents if isinstance(a, DrunkDriverAgent) and a.collided)
+            }
+        )
+        self.datacollector.collect(self)    
+
     def add_vehicle(self, agent_type):
         unique_id = max(agent.unique_id for agent in self.schedule.agents) + 1
         # Para TaxiAgent, elige un carril extremo basado en dónde comienza y termina la calle
@@ -257,7 +268,7 @@ class CityModel(mesa.Model):
 
             self.grid.place_agent(new_vehicle, (x, y))
             self.schedule.add(new_vehicle)
-            print("vehículo añadido")
+            # print("vehículo añadido")
 
     def is_cell_occupied_by_vehicle(self, x, y):
         cellmates = self.grid.get_cell_list_contents((x, y))
@@ -272,10 +283,11 @@ class CityModel(mesa.Model):
         # Verificar y añadir un TaxiAgent cada 30 pasos
         if self.num_steps % 30 == 0:
             self.add_vehicle(TaxiAgent)
-            print("aniadir taxi")
+            # print("aniadir taxi")
         # Verificar y añadir un DrunkDriverAgent cada 50 pasos
         if self.num_steps % 50 == 0:
             self.add_vehicle(DrunkDriverAgent)
-            print("aniadir borracho")
+            # print("aniadir borracho")
         # Actualizar todos los agentes
+        self.datacollector.collect(self)
         self.schedule.step()
